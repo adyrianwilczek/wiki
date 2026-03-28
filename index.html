@@ -2,7 +2,92 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>AdiśWiki</title>
+<title>AdiśWiki Online</title>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } 
+from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// 🔥 Twój config Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyAPGTGGXaG2k8rDWKcGW2kJTqi9YuwOEdM",
+  authDomain: "adiswiki-7a829.firebaseapp.com",
+  projectId: "adiswiki-7a829",
+  storageBucket: "adiswiki-7a829.firebasestorage.app",
+  messagingSenderId: "578408626245",
+  appId: "1:578408626245:web:c45716730030e7c3574b2c",
+  measurementId: "G-SRPH0EREFC"
+};
+
+// 🔥 Start Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ===== Zmienne globalne =====
+const ADMIN_PASSWORD = "Adminpanel48";
+let isAdmin = false;
+const container = document.getElementById("articles");
+
+// ===== Funkcje =====
+window.toggleTheme = function() {
+  document.body.classList.toggle("dark");
+}
+
+// Dodawanie artykułu
+window.addArticle = async function(){
+  const title = document.getElementById("title").value;
+  const text = document.getElementById("text").value;
+
+  if(!title || !text){ alert("Uzupełnij pola!"); return; }
+
+  await addDoc(collection(db, "articles"), { title, text });
+
+  document.getElementById("title").value="";
+  document.getElementById("text").value="";
+}
+
+// Panel admina
+window.loginAdmin = function(){
+  const pass = document.getElementById("admin-password").value;
+  if(pass === ADMIN_PASSWORD){
+    isAdmin = true;
+    document.getElementById("admin-status").textContent = "Zalogowany jako admin ✅";
+  } else alert("Błędne hasło!");
+}
+
+// Renderowanie artykułów (live)
+window.renderArticles = function(){
+  const query = document.getElementById("search")?.value.toLowerCase() || "";
+  container.innerHTML = "";
+
+  onSnapshot(collection(db, "articles"), (snapshot)=>{
+    container.innerHTML = "";
+    snapshot.forEach(docItem=>{
+      const a = docItem.data();
+      if(a.title.toLowerCase().includes(query)){
+        let div = document.createElement("div");
+        div.className = "article";
+        div.innerHTML = `<h3>${a.title}</h3><p>${a.text.replace(/\n/g,"<br>")}</p>`;
+        if(isAdmin){
+          let btn = document.createElement("button");
+          btn.className="delete-btn";
+          btn.textContent="Usuń";
+          btn.onclick = async ()=>{ await deleteDoc(doc(db, "articles", docItem.id)); };
+          div.appendChild(btn);
+        }
+        container.appendChild(div);
+      }
+    });
+  });
+}
+
+// Wywołanie renderu przy starcie
+renderArticles();
+
+</script>
+
 <style>
 body { font-family: Arial; margin:0; background:#f8f9fa; color:#000; transition: background 0.3s, color 0.3s; }
 header { background:#3366cc; color:white; padding:10px; text-align:center; display:flex; justify-content: space-between; align-items: center; }
@@ -20,6 +105,7 @@ body.dark .article { background:#1e1e1e; color:#f1f1f1; border:1px solid #333; }
 body.dark #admin-panel { background:#1e1e1e; color:#f1f1f1; }
 body.dark input, body.dark textarea { background:#2b2b2b; color:#f1f1f1; border:1px solid #444; }
 </style>
+
 </head>
 <body>
 
@@ -49,67 +135,6 @@ body.dark input, body.dark textarea { background:#2b2b2b; color:#f1f1f1; border:
 <div id="articles"></div>
 
 </div>
-
-<script>
-const ADMIN_PASSWORD = "Adminpanel48";
-let isAdmin = false;
-let articles = JSON.parse(localStorage.getItem("articles") || "[]");
-
-// ===== Tryb ciemny/jasny =====
-function toggleTheme(){
-  document.body.classList.toggle("dark");
-}
-
-// ===== Funkcje artykułów =====
-function saveArticles(){ localStorage.setItem("articles", JSON.stringify(articles)); }
-
-function renderArticles(){
-  const container = document.getElementById("articles");
-  container.innerHTML = "";
-
-  const query = document.getElementById("search")?.value.toLowerCase() || "";
-
-  articles
-    .filter(a => a.title.toLowerCase().includes(query))
-    .forEach((a,index)=>{
-      let div = document.createElement("div");
-      div.className = "article";
-      div.innerHTML = "<h3>"+a.title+"</h3><p>"+a.text.replace(/\n/g,"<br>")+"</p>";
-      if(isAdmin){
-        let btn = document.createElement("button");
-        btn.className="delete-btn";
-        btn.textContent="Usuń";
-        btn.onclick = ()=>{ articles.splice(index,1); saveArticles(); renderArticles(); };
-        div.appendChild(btn);
-      }
-      container.appendChild(div);
-    });
-}
-
-function addArticle(){
-  const title = document.getElementById("title").value;
-  const text = document.getElementById("text").value;
-  if(!title || !text){ alert("Uzupełnij pola!"); return; }
-  articles.unshift({ title, text });
-  saveArticles();
-  document.getElementById("title").value="";
-  document.getElementById("text").value="";
-  renderArticles();
-}
-
-function loginAdmin(){
-  const pass = document.getElementById("admin-password").value;
-  if(pass===ADMIN_PASSWORD){
-    isAdmin=true;
-    document.getElementById("admin-status").textContent="Zalogowany jako admin ✅";
-    renderArticles();
-  } else {
-    alert("Błędne hasło!");
-  }
-}
-
-renderArticles();
-</script>
 
 </body>
 </html>
