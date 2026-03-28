@@ -4,89 +4,87 @@
 <meta charset="UTF-8">
 <title>AdiśWiki Online</title>
 
-<!-- Firebase -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy } 
-from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+document.addEventListener("DOMContentLoaded", async () => {
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy } 
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// 🔥 Twój config Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyAPGTGGXaG2k8rDWKcGW2kJTqi9YuwOEdM",
+  const firebaseConfig = {
+   apiKey: "AIzaSyAPGTGGXaG2k8rDWKcGW2kJTqi9YuwOEdM",
   authDomain: "adiswiki-7a829.firebaseapp.com",
   projectId: "adiswiki-7a829",
   storageBucket: "adiswiki-7a829.firebasestorage.app",
   messagingSenderId: "578408626245",
   appId: "1:578408626245:web:c45716730030e7c3574b2c",
   measurementId: "G-SRPH0EREFC"
-};
+  };
 
-// 🔥 Start Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-// ===== Zmienne globalne =====
-const ADMIN_PASSWORD = "Adminpanel48";
-let isAdmin = false;
-const container = document.getElementById("articles");
+  const ADMIN_PASSWORD = "Adminpanel48";
+  let isAdmin = false;
 
-// ===== Tryb ciemny/jasny =====
-window.toggleTheme = function() {
-  document.body.classList.toggle("dark");
-}
+  const articlesContainer = document.getElementById("articles");
+  const searchInput = document.getElementById("search");
 
-// ===== Dodawanie artykułu do Firestore =====
-window.addArticle = async function() {
-  const title = document.getElementById("title").value;
-  const text = document.getElementById("text").value;
-  if(!title || !text){ alert("Uzupełnij pola!"); return; }
+  // ===== Tryb ciemny/jasny =====
+  window.toggleTheme = function() {
+    document.body.classList.toggle("dark");
+  }
 
-  await addDoc(collection(db, "articles"), { title, text, timestamp: Date.now() });
+  // ===== Dodawanie artykułu =====
+  window.addArticle = async function() {
+    const title = document.getElementById("title").value.trim();
+    const text = document.getElementById("text").value.trim();
+    if(!title || !text){ alert("Uzupełnij pola!"); return; }
 
-  document.getElementById("title").value="";
-  document.getElementById("text").value="";
-}
+    await addDoc(collection(db, "articles"), { title, text, timestamp: Date.now() });
+    document.getElementById("title").value="";
+    document.getElementById("text").value="";
+  }
 
-// ===== Panel admina =====
-window.loginAdmin = function() {
-  const pass = document.getElementById("admin-password").value;
-  if(pass === ADMIN_PASSWORD){
-    isAdmin = true;
-    document.getElementById("admin-status").textContent = "Zalogowany jako admin ✅";
-  } else alert("Błędne hasło!");
-}
+  // ===== Logowanie admina =====
+  window.loginAdmin = function() {
+    const pass = document.getElementById("admin-password").value;
+    if(pass === ADMIN_PASSWORD){
+      isAdmin = true;
+      document.getElementById("admin-status").textContent = "Zalogowany jako admin ✅";
+    } else alert("Błędne hasło!");
+  }
 
-// ===== Renderowanie artykułów (live + wyszukiwanie) =====
-function render(snapshot) {
-  const queryText = document.getElementById("search")?.value.toLowerCase() || "";
-  container.innerHTML = "";
-  snapshot.forEach(docItem => {
-    const a = docItem.data();
-    if(a.title.toLowerCase().includes(queryText)){
-      let div = document.createElement("div");
-      div.className = "article";
-      div.innerHTML = `<h3>${a.title}</h3><p>${a.text.replace(/\n/g,"<br>")}</p>`;
-      if(isAdmin){
-        let btn = document.createElement("button");
-        btn.className="delete-btn";
-        btn.textContent="Usuń";
-        btn.onclick = async ()=>{ await deleteDoc(doc(db, "articles", docItem.id)); };
-        div.appendChild(btn);
+  // ===== Renderowanie artykułów =====
+  function render(snapshot) {
+    const queryText = searchInput.value.toLowerCase() || "";
+    articlesContainer.innerHTML = "";
+
+    snapshot.forEach(docItem => {
+      const a = docItem.data();
+      if(a.title.toLowerCase().includes(queryText)){
+        let div = document.createElement("div");
+        div.className = "article";
+        div.innerHTML = `<h3>${a.title}</h3><p>${a.text.replace(/\n/g,"<br>")}</p>`;
+        if(isAdmin){
+          let btn = document.createElement("button");
+          btn.className="delete-btn";
+          btn.textContent="Usuń";
+          btn.onclick = async ()=>{ await deleteDoc(doc(db, "articles", docItem.id)); };
+          div.appendChild(btn);
+        }
+        articlesContainer.appendChild(div);
       }
-      container.appendChild(div);
-    }
-  });
-}
+    });
+  }
 
-// ===== Live update =====
-const q = query(collection(db, "articles"), orderBy("timestamp", "desc"));
-onSnapshot(q, render);
-
-// Odświeżanie po wyszukiwaniu
-document.getElementById("search").addEventListener("input", () => {
+  // ===== Live update =====
+  const q = query(collection(db, "articles"), orderBy("timestamp", "desc"));
   onSnapshot(q, render);
-});
 
+  // ===== Live wyszukiwanie =====
+  searchInput.addEventListener("input", () => onSnapshot(q, render));
+
+});
 </script>
 
 <style>
