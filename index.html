@@ -2,91 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>AdiśWiki Online</title>
-
-<script type="module">
-document.addEventListener("DOMContentLoaded", async () => {
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy } 
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  const firebaseConfig = {
-   apiKey: "AIzaSyAPGTGGXaG2k8rDWKcGW2kJTqi9YuwOEdM",
-  authDomain: "adiswiki-7a829.firebaseapp.com",
-  projectId: "adiswiki-7a829",
-  storageBucket: "adiswiki-7a829.firebasestorage.app",
-  messagingSenderId: "578408626245",
-  appId: "1:578408626245:web:c45716730030e7c3574b2c",
-  measurementId: "G-SRPH0EREFC"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  const ADMIN_PASSWORD = "Adminpanel48";
-  let isAdmin = false;
-
-  const articlesContainer = document.getElementById("articles");
-  const searchInput = document.getElementById("search");
-
-  // ===== Tryb ciemny/jasny =====
-  window.toggleTheme = function() {
-    document.body.classList.toggle("dark");
-  }
-
-  // ===== Dodawanie artykułu =====
-  window.addArticle = async function() {
-    const title = document.getElementById("title").value.trim();
-    const text = document.getElementById("text").value.trim();
-    if(!title || !text){ alert("Uzupełnij pola!"); return; }
-
-    await addDoc(collection(db, "articles"), { title, text, timestamp: Date.now() });
-    document.getElementById("title").value="";
-    document.getElementById("text").value="";
-  }
-
-  // ===== Logowanie admina =====
-  window.loginAdmin = function() {
-    const pass = document.getElementById("admin-password").value;
-    if(pass === ADMIN_PASSWORD){
-      isAdmin = true;
-      document.getElementById("admin-status").textContent = "Zalogowany jako admin ✅";
-    } else alert("Błędne hasło!");
-  }
-
-  // ===== Renderowanie artykułów =====
-  function render(snapshot) {
-    const queryText = searchInput.value.toLowerCase() || "";
-    articlesContainer.innerHTML = "";
-
-    snapshot.forEach(docItem => {
-      const a = docItem.data();
-      if(a.title.toLowerCase().includes(queryText)){
-        let div = document.createElement("div");
-        div.className = "article";
-        div.innerHTML = `<h3>${a.title}</h3><p>${a.text.replace(/\n/g,"<br>")}</p>`;
-        if(isAdmin){
-          let btn = document.createElement("button");
-          btn.className="delete-btn";
-          btn.textContent="Usuń";
-          btn.onclick = async ()=>{ await deleteDoc(doc(db, "articles", docItem.id)); };
-          div.appendChild(btn);
-        }
-        articlesContainer.appendChild(div);
-      }
-    });
-  }
-
-  // ===== Live update =====
-  const q = query(collection(db, "articles"), orderBy("timestamp", "desc"));
-  onSnapshot(q, render);
-
-  // ===== Live wyszukiwanie =====
-  searchInput.addEventListener("input", () => onSnapshot(q, render));
-
-});
-</script>
-
+<title>AdiśWiki</title>
 <style>
 body { font-family: Arial; margin:0; background:#f8f9fa; color:#000; transition: background 0.3s, color 0.3s; }
 header { background:#3366cc; color:white; padding:10px; text-align:center; display:flex; justify-content: space-between; align-items: center; }
@@ -104,7 +20,6 @@ body.dark .article { background:#1e1e1e; color:#f1f1f1; border:1px solid #333; }
 body.dark #admin-panel { background:#1e1e1e; color:#f1f1f1; }
 body.dark input, body.dark textarea { background:#2b2b2b; color:#f1f1f1; border:1px solid #444; }
 </style>
-
 </head>
 <body>
 
@@ -128,12 +43,97 @@ body.dark input, body.dark textarea { background:#2b2b2b; color:#f1f1f1; border:
 <button onclick="addArticle()">Dodaj artykuł</button>
 
 <h3>Szukaj artykułu</h3>
-<input id="search" placeholder="Wpisz tytuł...">
+<input id="search" placeholder="Wpisz tytuł..." oninput="renderArticles()">
 
 <h3>Artykuły</h3>
 <div id="articles"></div>
 
 </div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore.js";
+
+// ===== Firebase config =====
+const firebaseConfig = {
+   apiKey: "AIzaSyAPGTGGXaG2k8rDWKcGW2kJTqi9YuwOEdM",
+  authDomain: "adiswiki-7a829.firebaseapp.com",
+  projectId: "adiswiki-7a829",
+  storageBucket: "adiswiki-7a829.firebasestorage.app",
+  messagingSenderId: "578408626245",
+  appId: "1:578408626245:web:c45716730030e7c3574b2c",
+  measurementId: "G-SRPH0EREFC"
+};
+
+// ===== Initialize Firebase =====
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const articlesCol = collection(db, "articles");
+
+// ===== Zmienne =====
+const ADMIN_PASSWORD = "Adminpanel48";
+let isAdmin = false;
+let articles = [];
+
+// ===== Tryb ciemny/jasny =====
+function toggleTheme(){
+  document.body.classList.toggle("dark");
+}
+
+// ===== Renderowanie artykułów =====
+function renderArticles(){
+  const container = document.getElementById("articles");
+  container.innerHTML = "";
+  const queryText = document.getElementById("search")?.value.toLowerCase() || "";
+
+  articles
+    .filter(a => a.title.toLowerCase().includes(queryText))
+    .forEach(a=>{
+      let div = document.createElement("div");
+      div.className = "article";
+      div.innerHTML = `<h3>${a.title}</h3><p>${a.text.replace(/\n/g,"<br>")}</p>`;
+      if(isAdmin){
+        let btn = document.createElement("button");
+        btn.className="delete-btn";
+        btn.textContent="Usuń";
+        btn.onclick = async ()=>{
+          await deleteDoc(doc(db, "articles", a.id));
+        };
+        div.appendChild(btn);
+      }
+      container.appendChild(div);
+    });
+}
+
+// ===== Dodawanie artykułu =====
+async function addArticle(){
+  const title = document.getElementById("title").value;
+  const text = document.getElementById("text").value;
+  if(!title || !text){ alert("Uzupełnij pola!"); return; }
+  await addDoc(articlesCol, { title, text, timestamp: Date.now() });
+  document.getElementById("title").value="";
+  document.getElementById("text").value="";
+}
+
+// ===== Panel admina =====
+function loginAdmin(){
+  const pass = document.getElementById("admin-password").value;
+  if(pass===ADMIN_PASSWORD){
+    isAdmin=true;
+    document.getElementById("admin-status").textContent="Zalogowany jako admin ✅";
+  } else {
+    alert("Błędne hasło!");
+  }
+}
+
+// ===== Nasłuchiwanie zmian w Firestore =====
+const q = query(articlesCol, orderBy("timestamp", "desc"));
+onSnapshot(q, (snapshot)=>{
+  articles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  renderArticles();
+});
+</script>
 
 </body>
 </html>
